@@ -4,6 +4,8 @@
 
 using Microsoft.AspNetCore.Components.Forms;
 
+using System.Reflection;
+
 namespace BootstrapBlazor.Components;
 
 /// <summary>
@@ -131,14 +133,34 @@ public abstract class UploadBase<TValue> : ValidateBase<TValue>, IUpload
         {
             { "hidden", "hidden" }
         };
-        if (!string.IsNullOrEmpty(Accept))
-        {
-            ret.Add("accept", Accept);
-        }
+
         if (!string.IsNullOrEmpty(Capture))
         {
             ret.Add("capture", Capture);
         }
+
+        if (!string.IsNullOrEmpty(Accept))
+        {
+            ret.Add("accept", Accept);
+        }
+        else
+        {
+            var type = typeof(TValue);
+            if (type.IsAssignableTo(typeof(IBrowserFile)))
+            {
+                var attrs = type.GetCustomAttributes(typeof(FileValidationAttribute), false);
+                if (typeof(TValue).GetCustomAttributes(typeof(FileValidationAttribute), false).FirstOrDefault() is FileValidationAttribute fileValidation)
+                {
+                    var accept = string.Empty;
+                    foreach (var item in fileValidation.Extensions)
+                    {
+                        accept = string.Join(",", fileValidation.Extensions);
+                    }
+                    ret.Add("accept", accept);
+                }
+            }
+        }
+
         return ret;
     }
 
