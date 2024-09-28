@@ -3,6 +3,7 @@
 // Website: https://www.blazor.zone or https://argozhang.github.io/
 
 using Microsoft.Extensions.Localization;
+using System.ComponentModel.Design;
 using System.Globalization;
 
 namespace BootstrapBlazor.Components;
@@ -209,6 +210,12 @@ public partial class DateTimePicker<TValue>
     [Parameter]
     public bool ShowHolidays { get; set; }
 
+    /// <summary>
+    /// 获取/设置 自定义禁用日期判断方法
+    /// </summary>
+    [Parameter]
+    public Func<DateTime, bool>? DisableDayCallback { get; set; }
+
     [Inject]
     [NotNull]
     private IStringLocalizer<DateTimePicker<DateTime>>? Localizer { get; set; }
@@ -257,7 +264,6 @@ public partial class DateTimePicker<TValue>
             throw new InvalidOperationException(GenericTypeErrorMessage);
         }
 
-        // Value 为 MinValue 时 设置 Value 默认值
         if (Value == null)
         {
             SelectedValue = DateTime.MinValue;
@@ -271,15 +277,31 @@ public partial class DateTimePicker<TValue>
             SelectedValue = (DateTime)(object)Value;
         }
 
+        if (MinValue != null && MinValue > SelectedValue)
+        {
+            SelectedValue = ViewMode == DatePickerViewMode.DateTime ? MinValue.Value : MinValue.Value.Date;
+            Value = GetValue();
+        }
+        else if (MaxValue != null && MaxValue < SelectedValue)
+        {
+            SelectedValue = ViewMode == DatePickerViewMode.DateTime ? MaxValue.Value : MaxValue.Value.Date;
+            Value = GetValue();
+        }
+
         if (MinValueToEmpty(SelectedValue))
         {
-            SelectedValue = DateTime.Today;
+            SelectedValue = ViewMode == DatePickerViewMode.DateTime ? DateTime.Now : DateTime.Today;
             Value = default;
         }
         else if (MinValueToToday(SelectedValue))
         {
             SelectedValue = ViewMode == DatePickerViewMode.DateTime ? DateTime.Now : DateTime.Today;
-            Value = GetValue();
+            Value = IsDisableDay(SelectedValue) ? default : GetValue();
+        }
+        else if (IsDisableDay(SelectedValue))
+        {
+            SelectedValue = ViewMode == DatePickerViewMode.DateTime ? DateTime.Now : DateTime.Today;
+            Value = default;
         }
     }
 
@@ -299,7 +321,7 @@ public partial class DateTimePicker<TValue>
             d = v2.DateTime;
         }
 
-        if (d.HasValue && MinValueToToday(d.Value))
+        if (d.HasValue && MinValueToToday(d.Value) && !IsDisableDay(DateTime.Today))
         {
             d = DateTime.Today;
         }
@@ -314,6 +336,8 @@ public partial class DateTimePicker<TValue>
     private bool MinValueToEmpty(DateTime val) => val == DateTime.MinValue && AllowNull && DisplayMinValueAsEmpty;
 
     private bool MinValueToToday(DateTime val) => val == DateTime.MinValue && !AllowNull && AutoToday;
+
+    private bool IsDisableDay(DateTime val) => DisableDayCallback != null && DisableDayCallback(val);
 
     /// <summary>
     /// 确认按钮点击时回调此方法
